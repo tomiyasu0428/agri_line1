@@ -4,7 +4,8 @@ offset:document.getElementById('offset'),unit:document.getElementById('unit'),di
 start:document.getElementById('startBtn'),stop:document.getElementById('stopBtn'),
 setA:document.getElementById('setA'),setB:document.getElementById('setB'),clearAB:document.getElementById('clearAB'),swath:document.getElementById('swath'),
 prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),snapNearest:document.getElementById('snapNearest'),
-log:document.getElementById('log'),viz:document.getElementById('viz'),vizRange:document.getElementById('vizRange'), warn:document.getElementById('warn')};
+log:document.getElementById('log'),viz:document.getElementById('viz'),vizRange:document.getElementById('vizRange'), warn:document.getElementById('warn'),
+wakelockBtn:document.getElementById('wakelockBtn'),speechBtn:document.getElementById('speechBtn')};
 
 const ctx=el.viz.getContext('2d');
 function resizeCanvas(){const rect=el.viz.getBoundingClientRect();el.viz.width=Math.max(600,Math.floor(rect.width*devicePixelRatio));el.viz.height=Math.floor(260*devicePixelRatio)}
@@ -12,9 +13,41 @@ resizeCanvas();addEventListener('resize',resizeCanvas);
 
  let watchId=null,pollId=null,last=null;
  let wakeLock=null;
-let A=null,B=null,swathWidth=parseFloat(localStorage.getItem('swathWidth')||el.swath.value)||2.0,currentLineIndex=0;
+let A=null,B=null,swathWidth=parseFloat(localStorage.getItem('swathWidth')||el.swath.value)||2.0,currentLineIndex=parseInt(localStorage.getItem('lineIndex')||'0',10)||0;
 let tickCount=0,lastHzAt=performance.now(), lastUpdateAt=0;
 const R=6378137,toRad=d=>d*Math.PI/180;
+// 音声ガイダンス
+let speechEnabled=(localStorage.getItem('speechEnabled')==='1');
+let lastSpokenAt=0; // ms
+let lastSpokenState='none'; // 'left'|'right'|'ok'|'none'
+const SPEAK_COOLDOWN_MS=2500;
+const THRESH_OUT=0.30; // m
+const THRESH_IN =0.25; // m (hysteresis)
+function updateSpeechBtnLabel(){ el.speechBtn.textContent='音声: '+(speechEnabled?'ON':'OFF'); }
+function speak(text){
+  try{
+    if(!speechEnabled) return;
+    const now=performance.now();
+    if(now-lastSpokenAt<SPEAK_COOLDOWN_MS) return;
+    const uttr=new SpeechSynthesisUtterance(text);
+    uttr.lang='ja-JP';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(uttr);
+    lastSpokenAt=now;
+  }catch(_){}
+}
+function speakGuidance(offset){
+  if(!speechEnabled) return;
+  if(!Number.isFinite(offset)) return;
+  const abs=Math.abs(offset);
+  if(abs>=THRESH_OUT){
+    const dir=offset>0?'左へ':'右へ';
+    const state=offset>0?'left':'right';
+    if(state!==lastSpokenState){ speak(`${dir}${abs.toFixed(1)}メートル`); lastSpokenState=state; }
+  }else if(abs<=THRESH_IN){
+    if(lastSpokenState!=='ok'){ speak('OK'); lastSpokenState='ok'; }
+  }
+}
 
 function log(s){const t=new Date().toLocaleTimeString();el.log.textContent=`[${t}] ${s}\n`+el.log.textContent}
 
@@ -51,7 +84,7 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
          headingDeg=((rad*180/Math.PI)+360)%360;
        }
        if(Number.isFinite(headingDeg)) el.hdg.textContent=Math.round(headingDeg).toString();
-     }
+      }
    }
    last=cur;
    // オフセット計算と描画
@@ -72,6 +105,21 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
    }
    updateUI(offset,distFromA,abDist);
    drawViz(offset);
+    // 音声ガイダンス
+    speakGuidance(offset);
+    // polling -> watch 自動復帰判定
+    if(!watchId && pollId){
+      onGeo._pollOk=(onGeo._pollOk||0)+1;
+      if(onGeo._pollOk>=10){
+        try{
+          clearInterval(pollId); pollId=null; onGeo._pollOk=0;
+          const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000};
+          watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error(retry): '+e.message);}, opts);
+          el.mode.textContent='watch';
+          log('resume watchPosition after stable polling');
+        }catch(e){ log('resume watch error: '+e.message); }
+      }
+    }
  }
 
 function startWatch(){ if (watchId||pollId) stopAll(); const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000}; try{ watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error: '+e.message);}, opts); el.mode.textContent='watch'; }catch(e){ log('watchPosition exception: '+e.message); } el.start.disabled=true; el.stop.disabled=false; // guard監視
@@ -124,7 +172,16 @@ document.getElementById('clearAB').addEventListener('click', ()=>{A=null;B=null;
      else{ await requestWakeLock(); }
    }catch(e){ log('wakeLock toggle error: '+e.message); }
  }
- document.getElementById('wakelockBtn').addEventListener('click', ()=>{ toggleWakeLock(); });
- document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLock==null && el.wakelockBtn.textContent.includes('ON')){ requestWakeLock(); }});
+ el.wakelockBtn.addEventListener('click', ()=>{ toggleWakeLock(); localStorage.setItem('wakePref', el.wakelockBtn.textContent.includes('ON')?'1':'0'); });
+ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLock==null && localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }});
+
+ // 音声ON/OFFトグル
+ el.speechBtn.addEventListener('click', ()=>{ speechEnabled=!speechEnabled; localStorage.setItem('speechEnabled', speechEnabled?'1':'0'); updateSpeechBtnLabel(); });
+
+ // 初期UI反映
+ updateSpeechBtnLabel();
+ if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
+ el.swath.value=String(swathWidth);
+ if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
 drawViz(0);
 })();
