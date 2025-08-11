@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>StraightBar Lite – Visual v0.2.3-robust</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>StraightBar Lite – Visual</h1>
+    <div id="status">
+      GPS: <span id="gpsStatus">待機中</span>
+      / 精度: <span id="acc">-</span>m
+      / 速度: <span id="spd">-</span>km/h
+      / 針路: <span id="hdg">-</span>°
+      / 更新: <span id="hz">-</span>Hz
+      / モード: <span id="mode">watch</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="display">
+      <div id="dir">—</div>
+      <div id="offset">0.00</div>
+      <div id="unit">m</div>
+      <div id="hint">A/Bラインを設定してください</div>
+      <div id="distInfo" class="note"></div>
+      <div id="warn" class="warn" style="display:none;">⚠ 3秒以上位置更新がありません（権限/電波/屋外条件をご確認ください）</div>
+    </section>
+
+    <section id="vizWrap">
+      <canvas id="viz"></canvas>
+      <div id="vizHud">
+        <span>VISUAL</span>
+        <span id="vizRange">±2.0 m</span>
+      </div>
+    </section>
+
+    <section id="controls">
+      <div class="row">
+        <button id="startBtn">計測開始</button>
+        <button id="stopBtn" disabled>停止</button>
+        <button id="wakelockBtn">画面常時ON</button>
+        <button id="speechBtn">音声: OFF</button>
+      </div>
+      <div class="row">
+        <button id="setA">A点 設定</button>
+        <button id="setB" disabled>B点 設定</button>
+        <button id="clearAB">A/Bクリア</button>
+      </div>
+      <div class="row">
+        <label>スワス幅(m): <input id="swath" type="number" min="0.1" step="0.1" value="2.0"></label>
+        <button id="prevLine">← 1本前へ</button>
+        <button id="nextLine">1本次へ →</button>
+        <button id="snapNearest">最寄ライン</button>
+      </div>
+      <div class="row">
+        <button id="darkModeBtn">夜間モード</button>
+        <button id="resetKalman">フィルタリセット</button>
+        <button id="exportState">状態保存</button>
+      </div>
+    </section>
+
+    <section id="log"></section>
+  </main>
+
+  <footer>
+    <small>※スマホ内蔵GPSは数mブレます。広い作業幅向けの“目安”用途。 v0.2.3-robust（SWなし, nocache）</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
