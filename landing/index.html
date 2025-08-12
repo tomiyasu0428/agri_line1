@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>StraightBar Lite – Visual | ランディング</title>
+  <meta name="description" content="屋外作業の直進補助。左右のズレを“パッと見”で直感表示する軽量Webアプリ。Driveモード搭載。">
+  <link rel="icon" href="../icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <div class="brand">StraightBar Lite – Visual</div>
+    <nav>
+      <a href="#features">特長</a>
+      <a href="#howto">使い方</a>
+      <a href="#ext">外部GPS</a>
+      <a href="#cta">試してみる</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>“一瞬見て分かる” 直進ガイド</h1>
+      <p>左右のズレだけに集中。Driveモードで矢印・色・ターゲット点を提示。スマホだけで今すぐ使える軽量Webアプリ。</p>
+      <div class="cta">
+        <a class="btn primary" href="../index.html">デモを試す</a>
+        <a class="btn" href="https://github.com/tomiyasu0428/agri_line1" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="btn" href="../USAGE.md" target="_blank" rel="noreferrer">使い方</a>
+      </div>
+      <img class="hero-img" src="../icons/icon-512.png" alt="StraightBar Visual"/>
+    </section>
+
+    <section id="features" class="features">
+      <h2>特長</h2>
+      <ul>
+        <li><strong>Driveモード</strong>: 矢印と背景色でズレ量を即判断（Wide/Normalしきい値）</li>
+        <li><strong>キャロット(◎)</strong>: 2秒先のターゲット点に自車を重ねるだけ</li>
+        <li><strong>ロバスト更新</strong>: watch停止時は自動でpollingにフォールバック</li>
+        <li><strong>PWA対応</strong>: オフラインでも軽快（nocache検証版あり）</li>
+      </ul>
+    </section>
+
+    <section id="howto" class="howto">
+      <h2>使い方（3分で開始）</h2>
+      <ol>
+        <li>「計測開始」→ その場で <strong>A点</strong> 設定</li>
+        <li>10〜30m直進 → <strong>B点</strong> 設定</li>
+        <li><strong>最寄ライン</strong> で合わせ、必要なら <strong>Driveモード</strong> をON</li>
+      </ol>
+      <p class="note">スマホGPSは ±数m〜十数m。狭い作業幅では“目安用途”に留まります。</p>
+    </section>
+
+    <section id="ext" class="extension">
+      <h2>外部GPSでさらに安定</h2>
+      <p>iOS/AndroidともにOS統合GNSS（Dual XGPS160、Garmin GLO 2、Bad Elf など）で精度向上が期待できます。詳細は <a href="../外部GPS拡張.md" target="_blank" rel="noreferrer">外部GPS拡張メモ</a> をご覧ください。</p>
+    </section>
+
+    <section id="cta" class="cta-block">
+      <a class="btn primary" href="../index.html">デモを試す</a>
+      <a class="btn" href="../README.md" target="_blank" rel="noreferrer">README</a>
+      <a class="btn" href="../USAGE.md" target="_blank" rel="noreferrer">USAGE</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>© StraightBar Lite – Visual. v0.2.4 (Drive) preview</small>
+  </footer>
+</body>
+</html>
+
+
