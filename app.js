@@ -5,7 +5,8 @@ start:document.getElementById('startBtn'),stop:document.getElementById('stopBtn'
 setA:document.getElementById('setA'),setB:document.getElementById('setB'),clearAB:document.getElementById('clearAB'),swath:document.getElementById('swath'),
 prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),snapNearest:document.getElementById('snapNearest'),
 log:document.getElementById('log'),viz:document.getElementById('viz'),vizRange:document.getElementById('vizRange'), warn:document.getElementById('warn'),
-wakelockBtn:document.getElementById('wakelockBtn'),speechBtn:document.getElementById('speechBtn')};
+wakelockBtn:document.getElementById('wakelockBtn'),speechBtn:document.getElementById('speechBtn'),
+driveBtn:document.getElementById('driveBtn'),presetBtn:document.getElementById('presetBtn')};
 
 const ctx=el.viz.getContext('2d');
 function resizeCanvas(){const rect=el.viz.getBoundingClientRect();el.viz.width=Math.max(600,Math.floor(rect.width*devicePixelRatio));el.viz.height=Math.floor(260*devicePixelRatio)}
@@ -49,6 +50,18 @@ function speakGuidance(offset){
   }
 }
 
+// Driveモード
+let driveMode=(localStorage.getItem('driveMode')==='1');
+let preset=localStorage.getItem('drivePreset')||'wide'; // 'wide' | 'normal'
+function updateDriveButtons(){
+  el.driveBtn.textContent='Driveモード: '+(driveMode?'ON':'OFF');
+  el.presetBtn.textContent='しきい値: '+(preset==='wide'?'Wide':'Normal');
+}
+function getThresholds(){
+  if(preset==='wide') return {green:0.50,yellow:1.00}; // m
+  return {green:0.20,yellow:0.50};
+}
+
 function log(s){const t=new Date().toLocaleTimeString();el.log.textContent=`[${t}] ${s}\n`+el.log.textContent}
 
 function degToMeters(lat,lon,lat0,lon0){const x=toRad(lon-lon0)*R*Math.cos(toRad((lat+lat0)/2));const y=toRad(lat-lat0)*R;return {x,y}}
@@ -60,7 +73,48 @@ function setBFrom(lat,lon){if(!A)return;const xy=degToMeters(lat,lon,A.lat0,A.lo
 function crossTrack(p){if(!A||!B)return null;const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};const n=vecNorm(v);const w={x:p.x-A.xy.x,y:p.y-A.xy.y};const perp=w.x*(-n.y)+w.y*(n.x);return {perp}}
 function updateUI(offset, distFromA, abDist){const abs=Math.abs(offset);el.offset.textContent=abs.toFixed(2);el.unit.textContent='m';el.dir.textContent=offset>0?'← 左へ':(offset<0?'右へ →':'—');const info=[];if(isFinite(distFromA)) info.push(`A→現在: ${distFromA.toFixed(1)} m`);if(isFinite(abDist)) info.push(`AB距離: ${abDist.toFixed(1)} m`);el.distInfo.textContent=info.join(' / ')}
 
-function drawViz(offset){const w=el.viz.width,h=el.viz.height;ctx.clearRect(0,0,w,h);const range=Math.max(swathWidth*1.5,2.0);el.vizRange.textContent=`±${range.toFixed(1)} m`;const m2px=(w*0.8)/(range*2);const cx=w/2;ctx.fillStyle='#0f0f0f';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#2a2a2a';ctx.beginPath();for(let m=-range;m<=range;m+=swathWidth){const x=Math.round(cx+m*m2px);ctx.moveTo(x,0);ctx.lineTo(x,h)}ctx.stroke();ctx.strokeStyle='#66d1ff';ctx.lineWidth=3*devicePixelRatio;ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,h);ctx.stroke();const tx=Math.round(cx - offset*m2px),ty=h*0.65;ctx.fillStyle='#4de1c1';ctx.fillRect(tx-20,ty-35,40,70);}
+ function drawViz(offset){
+   const w=el.viz.width,h=el.viz.height;ctx.clearRect(0,0,w,h);
+   const range=Math.max(swathWidth*1.5,2.0);el.vizRange.textContent=`±${range.toFixed(1)} m`;
+   const m2px=(w*0.8)/(range*2);const cx=w/2;
+   // 背景
+   let bg='#0f0f0f';
+   if(driveMode){
+     const th=getThresholds();
+     const abs=Math.abs(offset);
+     if(abs<=th.green) bg='#0f2215'; else if(abs<=th.yellow) bg='#221f0f'; else bg='#2a1111';
+   }
+   ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+   // グリッド
+   ctx.strokeStyle='#2a2a2a';ctx.beginPath();for(let m=-range;m<=range;m+=swathWidth){const x=Math.round(cx+m*m2px);ctx.moveTo(x,0);ctx.lineTo(x,h)}ctx.stroke();
+   // 中央基準線
+   ctx.strokeStyle='#66d1ff';ctx.lineWidth=3*devicePixelRatio;ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,h);ctx.stroke();
+   // Driveモードの矢印＆キャロット
+   if(driveMode){
+     // ステア矢印（太さと長さを|offset|で決定）
+     const abs=Math.min(Math.abs(offset), range);
+     const len= (h*0.22) + (h*0.25)*(abs/range);
+     const width= (10*devicePixelRatio) + (20*devicePixelRatio)*(abs/range);
+     ctx.fillStyle= offset>0 ? '#4de1c1' : '#4db1e1';
+     const centerY=h*0.35;
+     if(offset>0){ // 左矢印
+       ctx.fillRect(cx-len, centerY-width/2, len, width);
+       ctx.beginPath(); ctx.moveTo(cx-len, centerY - width); ctx.lineTo(cx-len, centerY + width); ctx.lineTo(cx-len-(width*1.2), centerY); ctx.closePath(); ctx.fill();
+     }else if(offset<0){ // 右矢印
+       ctx.fillRect(cx, centerY-width/2, len, width);
+       ctx.beginPath(); ctx.moveTo(cx+len, centerY - width); ctx.lineTo(cx+len, centerY + width); ctx.lineTo(cx+len+(width*1.2), centerY); ctx.closePath(); ctx.fill();
+     }
+     // 自車アイコン
+     ctx.fillStyle='#e6e6e6'; const carY=h*0.65; ctx.fillRect(cx-10,carY-14,20,28);
+     // キャロット（◎）: 速度から先読み距離L
+     const spdKmh=parseFloat(el.spd.textContent)||0; const spd=spdKmh/3.6; // m/s
+     const L=Math.max(3, Math.min(8, 2*spd));
+     ctx.strokeStyle='#ffd24d'; ctx.lineWidth=2*devicePixelRatio; const tx=Math.round(cx - offset*m2px); const ty=carY - L*m2px*0.6; ctx.beginPath(); ctx.arc(tx, ty, 10, 0, Math.PI*2); ctx.stroke();
+   } else {
+     // 旧来のバー表示
+     const tx=Math.round(cx - offset*m2px),ty=h*0.65;ctx.fillStyle='#4de1c1';ctx.fillRect(tx-20,ty-35,40,70);
+   }
+ }
 
 function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.textContent=tickCount.toString();tickCount=0;lastHzAt=now;}}
  function onGeo(pos){
@@ -178,8 +232,13 @@ document.getElementById('clearAB').addEventListener('click', ()=>{A=null;B=null;
  // 音声ON/OFFトグル
  el.speechBtn.addEventListener('click', ()=>{ speechEnabled=!speechEnabled; localStorage.setItem('speechEnabled', speechEnabled?'1':'0'); updateSpeechBtnLabel(); });
 
+ // Driveモードとしきい値
+ el.driveBtn.addEventListener('click', ()=>{ driveMode=!driveMode; localStorage.setItem('driveMode', driveMode?'1':'0'); updateDriveButtons(); if(last&&A){const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);const ct=crossTrack(xy);const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);drawViz(offset);}else{drawViz(0);} });
+ el.presetBtn.addEventListener('click', ()=>{ preset=(preset==='wide'?'normal':'wide'); localStorage.setItem('drivePreset', preset); updateDriveButtons(); if(last&&A){const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);const ct=crossTrack(xy);const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);drawViz(offset);}else{drawViz(0);} });
+
  // 初期UI反映
  updateSpeechBtnLabel();
+ updateDriveButtons();
  if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
  el.swath.value=String(swathWidth);
  if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
