@@ -70,7 +70,22 @@ function dot(a,b){return a.x*b.x+a.y*b.y}
 function setAFrom(lat,lon){const lat0=lat,lon0=lon;A={xy:{x:0,y:0},deg:{lat,lon},lat0,lon0};B=null;el.setB.disabled=false;el.hint.textContent='A点設定済。B点を設定してください。';el.distInfo.textContent='';log(`A点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)}`)}
 function setBFrom(lat,lon){if(!A)return;const xy=degToMeters(lat,lon,A.lat0,A.lon0);B={xy,deg:{lat,lon},lat0:A.lat0,lon0:A.lon0};const dist=vecLen(xy);el.distInfo.textContent=`AB距離: ${dist.toFixed(2)} m`;if(dist<5){alert(`B点までの距離が短すぎます (${dist.toFixed(2)} m)。10〜30m離して設定してください。`)}el.hint.textContent='ABライン設定OK。最寄ラインへスナップ可。';log(`B点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)} (距離 ${dist.toFixed(2)} m)`)}
 
-function crossTrack(p){if(!A||!B)return null;const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};const n=vecNorm(v);const w={x:p.x-A.xy.x,y:p.y-A.xy.y};const perp=w.x*(-n.y)+w.y*(n.x);return {perp}}
+function getRotatedDirN(){
+  if(!A||!B) return {x:0,y:1};
+  const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};
+  const n=vecNorm(v);
+  const t=(typeof calib!=='undefined' && calib && Number.isFinite(calib.thetaBias)) ? calib.thetaBias : 0;
+  if(!t) return n;
+  const c=Math.cos(t), s=Math.sin(t);
+  return { x: n.x*c - n.y*s, y: n.x*s + n.y*c };
+}
+function crossTrack(p){
+  if(!A||!B)return null;
+  const n=getRotatedDirN();
+  const w={x:p.x-A.xy.x,y:p.y-A.xy.y};
+  const perp=w.x*(-n.y)+w.y*(n.x);
+  return {perp}
+}
 function updateUI(offset, distFromA, abDist){const abs=Math.abs(offset);el.offset.textContent=abs.toFixed(1);el.unit.textContent='m';el.dir.textContent=offset>0?'← 左へ':(offset<0?'右へ →':'—');const info=[];if(isFinite(distFromA)) info.push(`A→現在: ${distFromA.toFixed(1)} m`);if(isFinite(abDist)) info.push(`AB距離: ${abDist.toFixed(1)} m`);el.distInfo.textContent=info.join(' / ')}
 
  function drawViz(offset){
@@ -180,7 +195,7 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
 
 // --- キャリブ系: サンプルバッファ / 回帰 / 方位補正 ---
 const calib={samples:[], thetaBias:0};
-function alongAndPerp(xy){ if(!A||!B) return {t:0,e:0}; const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y}; const n=vecNorm(v); const w={x:xy.x-A.xy.x,y:xy.y-A.xy.y}; const t=dot(w,n); const e=w.x*(-n.y)+w.y*(n.x); return {t,e}; }
+function alongAndPerp(xy){ if(!A||!B) return {t:0,e:0}; const n=getRotatedDirN(); const w={x:xy.x-A.xy.x,y:xy.y-A.xy.y}; const t=dot(w,n); const e=w.x*(-n.y)+w.y*(n.x); return {t,e}; }
 function calibPushSample(xy, e, ts){ const ap=alongAndPerp(xy); calib.samples.push({t:ap.t,e:e,ts}); const maxM=120; while(calib.samples.length>2 && (calib.samples[calib.samples.length-1].t - calib.samples[0].t) > maxM){ calib.samples.shift(); } quickCalibrateIfReady(); autoRotateIfReady(); showMetrics(); }
 function linregTE(samples){ const n=samples.length; if(n<3) return null; let sumT=0,sumE=0,sumTT=0,sumTE=0; for(const s of samples){ sumT+=s.t; sumE+=s.e; sumTT+=s.t*s.t; sumTE+=s.t*s.e; } const denom=(n*sumTT - sumT*sumT); if(Math.abs(denom)<1e-6) return null; const slope=(n*sumTE - sumT*sumE)/denom; const intercept=(sumE - slope*sumT)/n; let ssTot=0,ssRes=0; const meanE=sumE/n; for(const s of samples){ const pred=slope*s.t+intercept; ssTot+=(s.e-meanE)*(s.e-meanE); ssRes+=(s.e-pred)*(s.e-pred); } const r2= ssTot>1e-6 ? 1-ssRes/ssTot : 0; return {slope,intercept,r2}; }
 function headingJitterDeg(){ const n=Math.min(calib.samples.length,20); if(n<3||!last) return NaN; let vals=[]; for(let i=1;i<n;i++){ const a=calib.samples[calib.samples.length-1-i]; const b=calib.samples[calib.samples.length-i]; const dx={x:b.t-a.t,y:b.e-a.e}; const rad=Math.atan2(dx.x,dx.y); const deg=((rad*180/Math.PI)+360)%360; vals.push(deg); } if(vals.length<3) return NaN; vals.sort((a,b)=>a-b); const med=vals[Math.floor(vals.length/2)]; let dev=0; for(const v of vals){ let d=Math.abs(v-med); if(d>180) d=360-d; dev+=d; } return dev/vals.length; }
