@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const el={gpsStatus:document.getElementById('gpsStatus'),acc:document.getElementById('acc'),spd:document.getElementById('spd'),hdg:document.getElementById('hdg'),hz:document.getElementById('hz'),mode:document.getElementById('mode'),
-offset:document.getElementById('offset'),unit:document.getElementById('unit'),dir:document.getElementById('dir'),hint:document.getElementById('hint'),distInfo:document.getElementById('distInfo'),
+offset:document.getElementById('offset'),unit:document.getElementById('unit'),dir:document.getElementById('dir'),hint:document.getElementById('hint'),distInfo:document.getElementById('distInfo'),qa:document.getElementById('qa'),
 start:document.getElementById('startBtn'),stop:document.getElementById('stopBtn'),
 setA:document.getElementById('setA'),setB:document.getElementById('setB'),clearAB:document.getElementById('clearAB'),swath:document.getElementById('swath'),
 prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),snapNearest:document.getElementById('snapNearest'),
@@ -35,8 +35,7 @@ function speak(text){
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(uttr);
     lastSpokenAt=now;
-  }catch(_){}
-}
+  }catch(_){}}
 function speakGuidance(offset){
   if(!speechEnabled) return;
   if(!Number.isFinite(offset)) return;
@@ -66,6 +65,7 @@ function log(s){const t=new Date().toLocaleTimeString();el.log.textContent=`[${t
 
 function degToMeters(lat,lon,lat0,lon0){const x=toRad(lon-lon0)*R*Math.cos(toRad((lat+lat0)/2));const y=toRad(lat-lat0)*R;return {x,y}}
 function vecLen(v){return Math.hypot(v.x,v.y)} function vecNorm(v){const L=vecLen(v)||1;return{x:v.x/L,y:v.y/L}} function vecPerp(v){return{x:-v.y,y:v.x}}
+function dot(a,b){return a.x*b.x+a.y*b.y}
 
 function setAFrom(lat,lon){const lat0=lat,lon0=lon;A={xy:{x:0,y:0},deg:{lat,lon},lat0,lon0};B=null;el.setB.disabled=false;el.hint.textContent='A点設定済。B点を設定してください。';el.distInfo.textContent='';log(`A点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)}`)}
 function setBFrom(lat,lon){if(!A)return;const xy=degToMeters(lat,lon,A.lat0,A.lon0);B={xy,deg:{lat,lon},lat0:A.lat0,lon0:A.lon0};const dist=vecLen(xy);el.distInfo.textContent=`AB距離: ${dist.toFixed(2)} m`;if(dist<5){alert(`B点までの距離が短すぎます (${dist.toFixed(2)} m)。10〜30m離して設定してください。`)}el.hint.textContent='ABライン設定OK。最寄ラインへスナップ可。';log(`B点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)} (距離 ${dist.toFixed(2)} m)`)}
@@ -152,6 +152,8 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
          const ct=crossTrack(xy);
          offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);
          el.hint.textContent=`ターゲット: ${currentLineIndex}本目 / 横ズレ ${offset.toFixed(2)} m`;
+         // キャリブ用サンプル更新
+         calibPushSample(xy, ct?ct.perp:0, cur.time);
        }else{
          el.hint.textContent='AB距離が短すぎます（5m以上に）';
        }
@@ -175,6 +177,16 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
       }
     }
  }
+
+// --- キャリブ系: サンプルバッファ / 回帰 / 方位補正 ---
+const calib={samples:[], thetaBias:0};
+function alongAndPerp(xy){ if(!A||!B) return {t:0,e:0}; const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y}; const n=vecNorm(v); const w={x:xy.x-A.xy.x,y:xy.y-A.xy.y}; const t=dot(w,n); const e=w.x*(-n.y)+w.y*(n.x); return {t,e}; }
+function calibPushSample(xy, e, ts){ const ap=alongAndPerp(xy); calib.samples.push({t:ap.t,e:e,ts}); const maxM=120; while(calib.samples.length>2 && (calib.samples[calib.samples.length-1].t - calib.samples[0].t) > maxM){ calib.samples.shift(); } quickCalibrateIfReady(); autoRotateIfReady(); showMetrics(); }
+function linregTE(samples){ const n=samples.length; if(n<3) return null; let sumT=0,sumE=0,sumTT=0,sumTE=0; for(const s of samples){ sumT+=s.t; sumE+=s.e; sumTT+=s.t*s.t; sumTE+=s.t*s.e; } const denom=(n*sumTT - sumT*sumT); if(Math.abs(denom)<1e-6) return null; const slope=(n*sumTE - sumT*sumE)/denom; const intercept=(sumE - slope*sumT)/n; let ssTot=0,ssRes=0; const meanE=sumE/n; for(const s of samples){ const pred=slope*s.t+intercept; ssTot+=(s.e-meanE)*(s.e-meanE); ssRes+=(s.e-pred)*(s.e-pred); } const r2= ssTot>1e-6 ? 1-ssRes/ssTot : 0; return {slope,intercept,r2}; }
+function headingJitterDeg(){ const n=Math.min(calib.samples.length,20); if(n<3||!last) return NaN; let vals=[]; for(let i=1;i<n;i++){ const a=calib.samples[calib.samples.length-1-i]; const b=calib.samples[calib.samples.length-i]; const dx={x:b.t-a.t,y:b.e-a.e}; const rad=Math.atan2(dx.x,dx.y); const deg=((rad*180/Math.PI)+360)%360; vals.push(deg); } if(vals.length<3) return NaN; vals.sort((a,b)=>a-b); const med=vals[Math.floor(vals.length/2)]; let dev=0; for(const v of vals){ let d=Math.abs(v-med); if(d>180) d=360-d; dev+=d; } return dev/vals.length; }
+function showMetrics(){ const n=calib.samples.length; if(n<5){ el.qa.textContent=''; return; } const windowM=calib.samples[n-1].t - calib.samples[0].t; const reg=linregTE(calib.samples); const jitter=headingJitterDeg(); if(reg){ el.qa.textContent=`品質: R²=${reg.r2.toFixed(2)} / ゆらぎ≈${Number.isFinite(jitter)?jitter.toFixed(1):'-'}° / 窓=${windowM.toFixed(0)}m`; } }
+function quickCalibrateIfReady(){ if(!A||!B) return; const n=calib.samples.length; if(n<6) return; const windowM=calib.samples[n-1].t - calib.samples[0].t; if(windowM<12 || windowM>20) return; const reg=linregTE(calib.samples); if(!reg) return; const jitter=headingJitterDeg(); if(reg.r2>=0.90 && (Number.isFinite(jitter)?jitter:0)<=3){ const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y}; const len=vecLen(v)||1; const bearing=Math.atan2(v.x,v.y) + calib.thetaBias; const nx={x:Math.sin(bearing), y:Math.cos(bearing)}; const newB={x:A.xy.x + nx.x*len, y:A.xy.y + nx.y*len}; B={...B, xy:newB}; el.hint.textContent='方位合わせ完了（クイック）'; calib.samples=[]; } }
+function autoRotateIfReady(){ const n=calib.samples.length; if(n<8) return; const windowM=calib.samples[n-1].t - calib.samples[0].t; if(windowM<30) return; const reg=linregTE(calib.samples); if(!reg) return; const s=reg.slope; if(Math.abs(s)<0.01) return; const dtheta=Math.asin(Math.max(-1,Math.min(1,s))); const step=Math.max(-Math.PI/180, Math.min(Math.PI/180, dtheta)); calib.thetaBias = Math.max(-5*Math.PI/180, Math.min(5*Math.PI/180, calib.thetaBias + 0.2*step)); }
 
 function startWatch(){ if (watchId||pollId) stopAll(); const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000}; try{ watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error: '+e.message);}, opts); el.mode.textContent='watch'; }catch(e){ log('watchPosition exception: '+e.message); } el.start.disabled=true; el.stop.disabled=false; // guard監視
   const guard=setInterval(()=>{ if(!watchId){ clearInterval(guard); return; } const idle=performance.now()-lastUpdateAt; el.warn.style.display = idle>3000 ? 'block':'none'; if(idle>5000){ // fallback to polling
@@ -252,5 +264,5 @@ document.getElementById('zeroNow').addEventListener('click', ()=>{
  if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
  el.swath.value=String(swathWidth);
  if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
-drawViz(0);
+ drawViz(0);
 })();
