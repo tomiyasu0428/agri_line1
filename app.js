@@ -68,7 +68,22 @@ function vecLen(v){return Math.hypot(v.x,v.y)} function vecNorm(v){const L=vecLe
 function dot(a,b){return a.x*b.x+a.y*b.y}
 
 function setAFrom(lat,lon){const lat0=lat,lon0=lon;A={xy:{x:0,y:0},deg:{lat,lon},lat0,lon0};B=null;el.setB.disabled=false;el.hint.textContent='A点設定済。B点を設定してください。';el.distInfo.textContent='';log(`A点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)}`)}
-function setBFrom(lat,lon){if(!A)return;const xy=degToMeters(lat,lon,A.lat0,A.lon0);B={xy,deg:{lat,lon},lat0:A.lat0,lon0:A.lon0};const dist=vecLen(xy);el.distInfo.textContent=`AB距離: ${dist.toFixed(2)} m`;if(dist<5){alert(`B点までの距離が短すぎます (${dist.toFixed(2)} m)。10〜30m離して設定してください。`)}el.hint.textContent='ABライン設定OK。最寄ラインへスナップ可。';log(`B点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)} (距離 ${dist.toFixed(2)} m)`)}
+function setBFrom(lat,lon){
+  if(!A)return;
+  const xy=degToMeters(lat,lon,A.lat0,A.lon0);
+  const dist=vecLen(xy);
+  el.distInfo.textContent=`AB距離: ${dist.toFixed(2)} m`;
+  if(dist<5){
+    B=null; // 無効化して再設定待ち
+    el.setB.disabled=false;
+    el.hint.textContent='B点が近すぎます。10m以上離して再設定してください';
+    log(`B点拒否(近すぎ): ${lat.toFixed(7)}, ${lon.toFixed(7)} (距離 ${dist.toFixed(2)} m)`);
+    return;
+  }
+  B={xy,deg:{lat,lon},lat0:A.lat0,lon0:A.lon0};
+  el.hint.textContent='ABライン設定OK。最寄ラインへスナップ可。';
+  log(`B点設定: ${lat.toFixed(7)}, ${lon.toFixed(7)} (距離 ${dist.toFixed(2)} m)`);
+}
 
 function getRotatedDirN(){
   if(!A||!B) return {x:0,y:1};
