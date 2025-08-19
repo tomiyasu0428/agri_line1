@@ -14,9 +14,7 @@
       GPS: <span id="gpsStatus">待機中</span>
       / 精度: <span id="acc">-</span>m
       / 速度: <span id="spd">-</span>km/h
-      / 進行方位: <span id="hdg">-</span>°
       / 更新: <span id="hz">-</span>Hz
-      / モード: <span id="mode">watch</span>
     </div>
   </header>
 
@@ -27,7 +25,6 @@
       <div id="unit">m</div>
       <div id="hint">A/Bラインを設定してください</div>
       <div id="distInfo" class="note"></div>
-      <div id="qa" class="note"></div>
       <div id="warn" class="warn" style="display:none;">⚠ 3秒以上位置更新がありません（権限/電波/屋外条件をご確認ください）</div>
     </section>
 
@@ -45,8 +42,6 @@
         <button id="stopBtn" disabled>停止</button>
         <button id="wakelockBtn">画面常時ON</button>
         <button id="speechBtn">音声: OFF</button>
-        <button id="driveBtn">Driveモード: OFF</button>
-        <button id="presetBtn">しきい値: Wide</button>
       </div>
       <div class="row">
         <button id="setA">A点 設定</button>
@@ -56,13 +51,10 @@
       </div>
       <div class="row">
         <label>作業幅 (m): <input id="swath" type="number" min="0.1" step="0.1" value="2.0"></label>
-        <button id="prevLine">← 1本前へ</button>
-        <button id="nextLine">1本次へ →</button>
-        <button id="snapNearest">最寄ライン</button>
+        <button id="prevLine">1本左へ</button>
+        <button id="nextLine">1本右へ</button>
       </div>
       <div class="row">
-        <button id="darkModeBtn">夜間モード</button>
-        <button id="resetKalman">フィルタリセット</button>
         <button id="exportState">状態保存</button>
       </div>
     </section>
