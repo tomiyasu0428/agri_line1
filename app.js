@@ -16,6 +16,7 @@ let wakeLock=null;
 let A=null,B=null,swathWidth=parseFloat(localStorage.getItem('swathWidth')||el.swath.value)||2.0,currentLineIndex=parseInt(localStorage.getItem('lineIndex')||'0',10)||0;
 let tickCount=0,lastHzAt=performance.now(), lastUpdateAt=0;
 const R=6378137,toRad=d=>d*Math.PI/180;
+ 
 
 function log(s){const t=new Date().toLocaleTimeString();el.log.textContent=`[${t}] ${s}\n`+el.log.textContent}
 
@@ -52,16 +53,30 @@ function updateUI(offset, distFromA, abDist){const abs=Math.abs(offset);el.offse
 
  function drawViz(offset){
    const w=el.viz.width,h=el.viz.height;ctx.clearRect(0,0,w,h);
-   const range=Math.max(swathWidth*1.5,2.0);el.vizRange.textContent=`±${range.toFixed(1)} m`;
+   const range=Math.max(swathWidth,2.0);el.vizRange.textContent=`±${range.toFixed(1)} m`;
    const m2px=(w*0.8)/(range*2);const cx=w/2;
    // 背景
    ctx.fillStyle='#0f0f0f';ctx.fillRect(0,0,w,h);
+   // 交互ストライプ（作業幅ごと）
+   if(swathWidth>0){
+     let stripe=0;
+     for(let m=-range;m<range;m+=swathWidth){
+       const x1=Math.round(cx+m*m2px);
+       const x2=Math.round(cx+Math.min(m+swathWidth,range)*m2px);
+       ctx.fillStyle = (stripe%2===0)?'#0f0f0f':'#111111';
+       ctx.fillRect(x1,0,Math.max(1,x2-x1),h);
+       stripe++;
+     }
+   }
    // グリッド
    ctx.strokeStyle='#2a2a2a';ctx.beginPath();for(let m=-range;m<=range;m+=swathWidth){const x=Math.round(cx+m*m2px);ctx.moveTo(x,0);ctx.lineTo(x,h)}ctx.stroke();
    // 中央基準線
    ctx.strokeStyle='#66d1ff';ctx.lineWidth=3*devicePixelRatio;ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,h);ctx.stroke();
-   // シンプルなバー表示
-   const tx=Math.round(cx - offset*m2px),ty=h*0.65;ctx.fillStyle='#4de1c1';ctx.fillRect(tx-20,ty-35,40,70);
+   // シンプルなバー表示（境界跨ぎで一時点滅）
+   const tx=Math.round(cx - offset*m2px),ty=h*0.65;
+   const now=performance.now();
+   ctx.fillStyle = (now < (window.__barFlashUntil||0)) ? '#ffd24d' : '#4de1c1';
+   ctx.fillRect(tx-20,ty-35,40,70);
  }
 
 function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.textContent=tickCount.toString();tickCount=0;lastHzAt=now;}}
@@ -91,6 +106,14 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
        if(abDist>=5){
          const ct=crossTrack(xy);
          offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);
+         // 境界跨ぎ検知（作業幅のどのストライプにいるか）
+         if(swathWidth>0){
+           const stripeIndex=Math.floor(((ct?ct.perp:0)/swathWidth));
+           if(window.__lastStripeIndex!==undefined && stripeIndex!==window.__lastStripeIndex){
+             window.__barFlashUntil=performance.now()+600; // 0.6s点滅
+           }
+           window.__lastStripeIndex=stripeIndex;
+         }
          el.hint.textContent=`ターゲット: ${currentLineIndex}本目 / 横ズレ ${offset.toFixed(2)} m`;
        }else{
          el.hint.textContent='AB距離が短すぎます（5m以上に）';
