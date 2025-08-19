@@ -3,52 +3,19 @@ const el={gpsStatus:document.getElementById('gpsStatus'),acc:document.getElement
 offset:document.getElementById('offset'),unit:document.getElementById('unit'),dir:document.getElementById('dir'),hint:document.getElementById('hint'),distInfo:document.getElementById('distInfo'),
 start:document.getElementById('startBtn'),stop:document.getElementById('stopBtn'),
 setA:document.getElementById('setA'),setB:document.getElementById('setB'),clearAB:document.getElementById('clearAB'),swath:document.getElementById('swath'),
-prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),snapNearest:document.getElementById('snapNearest'),
+prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),
 log:document.getElementById('log'),viz:document.getElementById('viz'),vizRange:document.getElementById('vizRange'), warn:document.getElementById('warn'),
-wakelockBtn:document.getElementById('wakelockBtn'),speechBtn:document.getElementById('speechBtn')};
+wakelockBtn:document.getElementById('wakelockBtn'), zeroNow:document.getElementById('zeroNow')};
 
 const ctx=el.viz.getContext('2d');
 function resizeCanvas(){const rect=el.viz.getBoundingClientRect();el.viz.width=Math.max(600,Math.floor(rect.width*devicePixelRatio));el.viz.height=Math.floor(260*devicePixelRatio)}
 resizeCanvas();addEventListener('resize',resizeCanvas);
 
- let watchId=null,pollId=null,last=null;
- let wakeLock=null;
+let watchId=null,pollId=null,last=null;
+let wakeLock=null;
 let A=null,B=null,swathWidth=parseFloat(localStorage.getItem('swathWidth')||el.swath.value)||2.0,currentLineIndex=parseInt(localStorage.getItem('lineIndex')||'0',10)||0;
 let tickCount=0,lastHzAt=performance.now(), lastUpdateAt=0;
 const R=6378137,toRad=d=>d*Math.PI/180;
-// 音声ガイダンス
-let speechEnabled=(localStorage.getItem('speechEnabled')==='1');
-let lastSpokenAt=0; // ms
-let lastSpokenState='none'; // 'left'|'right'|'ok'|'none'
-const SPEAK_COOLDOWN_MS=2500;
-const THRESH_OUT=0.30; // m
-const THRESH_IN =0.25; // m (hysteresis)
-function updateSpeechBtnLabel(){ el.speechBtn.textContent='音声: '+(speechEnabled?'ON':'OFF'); }
-function speak(text){
-  try{
-    if(!speechEnabled) return;
-    const now=performance.now();
-    if(now-lastSpokenAt<SPEAK_COOLDOWN_MS) return;
-    const uttr=new SpeechSynthesisUtterance(text);
-    uttr.lang='ja-JP';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(uttr);
-    lastSpokenAt=now;
-  }catch(_){}}
-function speakGuidance(offset){
-  if(!speechEnabled) return;
-  if(!Number.isFinite(offset)) return;
-  const abs=Math.abs(offset);
-  if(abs>=THRESH_OUT){
-    const dir=offset>0?'左へ':'右へ';
-    const state=offset>0?'left':'right';
-    if(state!==lastSpokenState){ speak(`${dir}${abs.toFixed(1)}メートル`); lastSpokenState=state; }
-  }else if(abs<=THRESH_IN){
-    if(lastSpokenState!=='ok'){ speak('OK'); lastSpokenState='ok'; }
-  }
-}
-
-// Driveモード削除（シンプル化）
 
 function log(s){const t=new Date().toLocaleTimeString();el.log.textContent=`[${t}] ${s}\n`+el.log.textContent}
 
@@ -78,10 +45,7 @@ function getRotatedDirN(){
   if(!A||!B) return {x:0,y:1};
   const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};
   const n=vecNorm(v);
-  const t=(typeof calib!=='undefined' && calib && Number.isFinite(calib.thetaBias)) ? calib.thetaBias : 0;
-  if(!t) return n;
-  const c=Math.cos(t), s=Math.sin(t);
-  return { x: n.x*c - n.y*s, y: n.x*s + n.y*c };
+  return n;
 }
 function crossTrack(p){if(!A||!B)return null;const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};const n=vecNorm(v);const w={x:p.x-A.xy.x,y:p.y-A.xy.y};const perp=w.x*(-n.y)+w.y*(n.x);return {perp}}
 function updateUI(offset, distFromA, abDist){const abs=Math.abs(offset);el.offset.textContent=abs.toFixed(1);el.unit.textContent='m';el.dir.textContent=offset>0?'← 左へ':(offset<0?'右へ →':'—');const info=[];if(isFinite(distFromA)) info.push(`A→現在: ${distFromA.toFixed(1)} m`);if(isFinite(abDist)) info.push(`AB距離: ${abDist.toFixed(1)} m`);el.distInfo.textContent=info.join(' / ')}
@@ -135,8 +99,6 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
    }
    updateUI(offset,distFromA,abDist);
    drawViz(offset);
-    // 音声ガイダンス
-    speakGuidance(offset);
     // polling -> watch 自動復帰判定
     if(!watchId && pollId){
       onGeo._pollOk=(onGeo._pollOk||0)+1;
@@ -145,7 +107,6 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
           clearInterval(pollId); pollId=null; onGeo._pollOk=0;
           const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000};
           watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error(retry): '+e.message);}, opts);
-          el.mode.textContent='watch';
           log('resume watchPosition after stable polling');
         }catch(e){ log('resume watch error: '+e.message); }
       }
@@ -154,9 +115,9 @@ function updateHz(){const now=performance.now();if(now-lastHzAt>=1000){el.hz.tex
 
 // --- キャリブ系: サンプルバッファ / 回帰 / 方位補正 ---
 
-function startWatch(){ if (watchId||pollId) stopAll(); const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000}; try{ watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error: '+e.message);}, opts); el.mode.textContent='watch'; }catch(e){ log('watchPosition exception: '+e.message); } el.start.disabled=true; el.stop.disabled=false; // guard監視
+function startWatch(){ if (watchId||pollId) stopAll(); const opts={enableHighAccuracy:true, maximumAge:0, timeout:15000}; try{ watchId=navigator.geolocation.watchPosition(onGeo, e=>{log('watchPosition error: '+e.message);}, opts); }catch(e){ log('watchPosition exception: '+e.message); } el.start.disabled=true; el.stop.disabled=false; // guard監視
   const guard=setInterval(()=>{ if(!watchId){ clearInterval(guard); return; } const idle=performance.now()-lastUpdateAt; el.warn.style.display = idle>3000 ? 'block':'none'; if(idle>5000){ // fallback to polling
-      try{ if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; } if(pollId) clearInterval(pollId); pollId=setInterval(()=>{ navigator.geolocation.getCurrentPosition(onGeo, err=>log('getCurrentPosition error: '+err.message), {enableHighAccuracy:true, maximumAge:0, timeout:8000}); }, 1000); el.mode.textContent='polling'; log('fallback to polling'); clearInterval(guard); }catch(e){ log('fallback error: '+e.message); }
+      try{ if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; } if(pollId) clearInterval(pollId); pollId=setInterval(()=>{ navigator.geolocation.getCurrentPosition(onGeo, err=>log('getCurrentPosition error: '+err.message), {enableHighAccuracy:true, maximumAge:0, timeout:8000}); }, 1000); log('fallback to polling'); clearInterval(guard); }catch(e){ log('fallback error: '+e.message); }
   } }, 1000);}
 
 function stopAll(){ if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;} if(pollId){clearInterval(pollId);pollId=null;} el.start.disabled=false; el.stop.disabled=true; el.warn.style.display='none'; el.hz.textContent='-'; }
@@ -178,20 +139,6 @@ document.getElementById('zeroNow').addEventListener('click', ()=>{
 });
  document.getElementById('prevLine').addEventListener('click', ()=>{currentLineIndex-=1; if(last&&A){const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);const ct=crossTrack(xy);const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);drawViz(offset);}else{drawViz(0);} });
  document.getElementById('nextLine').addEventListener('click', ()=>{currentLineIndex+=1; if(last&&A){const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);const ct=crossTrack(xy);const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);drawViz(offset);}else{drawViz(0);} });
- document.getElementById('snapNearest').addEventListener('click', ()=>{
-   if(!last||!A||!B){ alert('A/B設定と位置取得後に押してください'); return; }
-   const abDist=vecLen({x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y});
-   if(abDist<5){ alert('AB距離が短すぎます（5m以上に）'); return; }
-   const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);
-   const ct=crossTrack(xy);
-   const n=Math.round((ct?ct.perp:0)/swathWidth);
-   currentLineIndex=n;
-   const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);
-   const distFromA=vecLen(xy);
-   updateUI(offset,distFromA,abDist);
-   el.hint.textContent=`最寄ラインへスナップ: ${currentLineIndex}本目`;
-   drawViz(offset);
- });
 
  // 作業幅の変更を反映
  el.swath.addEventListener('change', ()=>{
@@ -217,13 +164,9 @@ document.getElementById('zeroNow').addEventListener('click', ()=>{
  el.wakelockBtn.addEventListener('click', ()=>{ toggleWakeLock(); localStorage.setItem('wakePref', el.wakelockBtn.textContent.includes('ON')?'1':'0'); });
  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLock==null && localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }});
 
- // 音声ON/OFFトグル
- el.speechBtn.addEventListener('click', ()=>{ speechEnabled=!speechEnabled; localStorage.setItem('speechEnabled', speechEnabled?'1':'0'); updateSpeechBtnLabel(); });
-
-  // 初期UI反映
-  updateSpeechBtnLabel();
-  if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
-  el.swath.value=String(swathWidth);
-  if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
-  drawViz(0);
+ // 初期UI反映
+ if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
+ el.swath.value=String(swathWidth);
+ if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
+ drawViz(0);
 })();
