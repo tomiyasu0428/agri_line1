@@ -48,7 +48,7 @@ function getRotatedDirN(){
   const n=vecNorm(v);
   return n;
 }
-function crossTrack(p){if(!A||!B)return null;const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};const n=vecNorm(v);const w={x:p.x-A.xy.x,y:p.y-A.xy.y};const perp=w.x*(-n.y)+w.y*(n.x);return {perp}}
+function crossTrack(p){if(!A||!B)return null;const v={x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y};const n=vecNorm(v);const w={x:p.x-A.xy.x,y:p.y-A.xy.y};const perp=-(w.x*(-n.y)+w.y*(n.x));return {perp}}
 function updateUI(offset, distFromA, abDist){const abs=Math.abs(offset);el.offset.textContent=abs.toFixed(1);el.unit.textContent='m';el.dir.textContent=offset>0?'← 左へ':(offset<0?'右へ →':'—');const info=[];if(isFinite(distFromA)) info.push(`A→現在: ${distFromA.toFixed(1)} m`);if(isFinite(abDist)) info.push(`AB距離: ${abDist.toFixed(1)} m`);el.distInfo.textContent=info.join(' / ')}
 
  function drawViz(offset){
@@ -155,8 +155,8 @@ document.getElementById('zeroNow').addEventListener('click', ()=>{
   if(!last||!A||!B){ alert('A/B設定と位置取得後に押してください'); return; }
   const abDist=vecLen({x:B.xy.x-A.xy.x,y:B.xy.y-A.xy.y}); if(abDist<5){ alert('AB距離が短すぎます（5m以上に）'); return; }
   const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0); const ct=crossTrack(xy); const perp=ct?ct.perp:0;
-  const deltaIndex=Math.round(perp/swathWidth);
-  currentLineIndex += deltaIndex;
+  currentLineIndex = Math.round(perp/swathWidth);
+  try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){}
   const offset=(currentLineIndex*swathWidth)-perp; const distFromA=vecLen(xy);
   updateUI(offset,distFromA,abDist); el.hint.textContent='ここをゼロを適用しました'; drawViz(offset);
 });
