@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <title>StraightBar Lite – Visual v0.2.3-robust</title>
+  <title>StraightBar Lite – Visual v0.2.6-robust</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
@@ -40,16 +40,17 @@
       <div class="row">
         <button id="startBtn">計測開始</button>
         <button id="stopBtn" disabled>停止</button>
-        <button id="wakelockBtn">画面常時ON</button>
       </div>
       <div class="row">
         <button id="setA">A点 設定</button>
         <button id="setB" disabled>B点 設定</button>
         <button id="clearAB">A/Bクリア</button>
-        <button id="zeroNow">ここをゼロ</button>
       </div>
       <div class="row">
+        <button id="zeroNow">ここをゼロ</button>
         <label>作業幅 (m): <input id="swath" type="number" min="0.1" step="0.1" value="2.0"></label>
+      </div>
+      <div class="row">
         <button id="prevLine">1本左へ</button>
         <button id="nextLine">1本右へ</button>
       </div>
@@ -59,7 +60,7 @@
   </main>
 
   <footer>
-    <small>※スマホ内蔵GPSは数mブレます。広い作業幅向けの“目安”用途。 v0.2.3-robust（SWなし, nocache）</small>
+    <small>※スマホ内蔵GPSは数mブレます。広い作業幅向けの“目安”用途。 v0.2.6-robust（SWなし, nocache）</small>
   </footer>
 
   <script src="app.js"></script>

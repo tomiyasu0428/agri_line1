@@ -5,14 +5,13 @@ start:document.getElementById('startBtn'),stop:document.getElementById('stopBtn'
 setA:document.getElementById('setA'),setB:document.getElementById('setB'),clearAB:document.getElementById('clearAB'),swath:document.getElementById('swath'),
 prevLine:document.getElementById('prevLine'),nextLine:document.getElementById('nextLine'),
 log:document.getElementById('log'),viz:document.getElementById('viz'),vizRange:document.getElementById('vizRange'), warn:document.getElementById('warn'),
-wakelockBtn:document.getElementById('wakelockBtn'), zeroNow:document.getElementById('zeroNow')};
+zeroNow:document.getElementById('zeroNow')};
 
 const ctx=el.viz.getContext('2d');
 function resizeCanvas(){const rect=el.viz.getBoundingClientRect();el.viz.width=Math.max(600,Math.floor(rect.width*devicePixelRatio));el.viz.height=Math.floor(260*devicePixelRatio)}
 resizeCanvas();addEventListener('resize',resizeCanvas);
 
 let watchId=null,pollId=null,last=null;
-let wakeLock=null;
 let A=null,B=null,swathWidth=parseFloat(localStorage.getItem('swathWidth')||el.swath.value)||2.0,currentLineIndex=parseInt(localStorage.getItem('lineIndex')||'0',10)||0;
 let tickCount=0,lastHzAt=performance.now(), lastUpdateAt=0;
 const R=6378137,toRad=d=>d*Math.PI/180;
@@ -169,26 +168,7 @@ document.getElementById('zeroNow').addEventListener('click', ()=>{
    if(last&&A){const xy=degToMeters(last.lat,last.lon,A.lat0,A.lon0);const ct=crossTrack(xy);const offset=(currentLineIndex*swathWidth)-(ct?ct.perp:0);drawViz(offset);}else{drawViz(0);} 
  });
 
- // Wake Lock（画面常時ON）
- async function requestWakeLock(){
-   if(!('wakeLock' in navigator)){ log('wakeLock unsupported'); alert('画面常時ONは端末/ブラウザ非対応です。自動ロック設定をご確認ください。'); return; }
-   try{
-     wakeLock=await navigator.wakeLock.request('screen');
-     el.wakelockBtn.textContent='画面常時ON: ON';
-     wakeLock.addEventListener('release',()=>{ el.wakelockBtn.textContent='画面常時ON'; wakeLock=null; });
-   }catch(e){ log('wakeLock error: '+e.message); }
- }
- async function toggleWakeLock(){
-   try{
-     if(wakeLock){ await wakeLock.release(); wakeLock=null; el.wakelockBtn.textContent='画面常時ON'; }
-     else{ await requestWakeLock(); }
-   }catch(e){ log('wakeLock toggle error: '+e.message); }
- }
- el.wakelockBtn.addEventListener('click', ()=>{ toggleWakeLock(); localStorage.setItem('wakePref', el.wakelockBtn.textContent.includes('ON')?'1':'0'); });
- document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && wakeLock==null && localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }});
-
  // 初期UI反映
- if(localStorage.getItem('wakePref')==='1'){ requestWakeLock(); }
  el.swath.value=String(swathWidth);
  if(Number.isFinite(currentLineIndex)) try{ localStorage.setItem('lineIndex', String(currentLineIndex)); }catch(_){ }
  drawViz(0);
