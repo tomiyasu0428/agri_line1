@@ -2,6 +2,8 @@
 
 WebView で GitHub Pages の StraightBar Lite – Visual を読み込み、Garmin GLO 2 と Bluetooth SPP で接続し、NMEA を `window.GnssBridge.feedNmea(...)` で JS 側へ 10Hz 供給する最小構成です。
 
+- スライド: [SLIDES.md](./SLIDES.md)
+
 ## ビルド
 - Android Studio Hedgehog+ 推奨
 - minSdk 26 / targetSdk 34, Kotlin 1.9
