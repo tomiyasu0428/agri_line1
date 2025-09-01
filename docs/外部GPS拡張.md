@@ -19,6 +19,7 @@
 
 3) 専用アプリ連携/ブリッジ（将来検討）
    - Androidのモックロケーション、iOSの専用SDK/EA(MFi)経由等。ブラウザ/PWA単体では制約が多い。
+   - 追加: 本リポジトリでは Android WebView + Bluetooth SPP + JSブリッジ（`gnss.js`）方式を提供。詳細は docs/android-glo2-integration.md。
 
 推奨デバイス候補（実績/入手性重視）
 - Dual XGPS160（10Hz, WAAS/EGNOS, iOS/Android）
@@ -78,5 +79,4 @@
 備考
 - iOS SafariはWeb Bluetooth非対応。ブラウザから直接NMEAを読む方針はAndroid限定。
 - ブラウザの geolocation 更新Hzは端末/OSに依存し、外部10Hzでも1–2Hzで届く場合がある。横ズレの視認性は精度向上で十分改善する見込み。
-
 

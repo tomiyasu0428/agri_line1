@@ -32,9 +32,11 @@ StraightBar Lite – Visual v0.2.6-robust
 - [次期修正案](docs/次期修正案.md)
 - [外部GPS拡張](docs/外部GPS拡張.md)
 - [改善提案](docs/改善提案.md)
+- [Android + GLO 2 連携（NMEA/10Hz）](docs/android-glo2-integration.md)
 
 開発者向け
 - 構成: `index.html`（UI）, `app.js`（ロジック/描画）, `style.css`（スタイル）, `manifest.json`（PWA）, `icons/`（アイコン）
+- Android拡張: `gnss.js` を `index.html` で先に読み込むことで、Android側のネイティブブリッジが存在する場合は `navigator.geolocation` が高レートGNSSに差し替わります（詳細は docs/android-glo2-integration.md）。
 - 投影: A点を原点とした平面近似（WGS84, R=6,378,137m）。緯度経度差をメートル座標へ変換
 - 横ズレ計算: `offset = currentLineIndex * swathWidth - perp`（右が正、左が負）
 - 位置取得: watchPosition → 3–5秒更新停止で `getCurrentPosition` 毎秒ポーリングへ切替（安定後は自動でwatchへ復帰）
@@ -54,4 +56,3 @@ StraightBar Lite – Visual v0.2.6-robust
 
 ライセンス
 - 未設定（必要に応じて追記）
-
