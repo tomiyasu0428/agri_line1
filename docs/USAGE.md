@@ -60,4 +60,10 @@ StraightBar Lite – Visual 使い方（v0.2.3-robust）
 バージョン
 - v0.2.3-robust（Service Workerなし検証版）
 
+---
+
+AndroidでGarmin GLO 2を使う（10Hz）
+- 本Webアプリを自前のAndroidアプリのWebViewで開き、Bluetooth SPPでGLO 2からNMEAを取得してJSへブリッジします。
+- 具体手順とKotlin最小例は docs/android-glo2-integration.md を参照。
+- 重要: Chromeなど外部ブラウザでURLを開くだけではSPP接続できません。ネイティブWebViewが必要です。
 
